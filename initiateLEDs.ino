@@ -1,4 +1,4 @@
-// Button pins
+   // Button pins
 const int buttonPins[4] = {5, 6, 7, 8};   // Up to 4 buttons on pins 5–8
 // LED pins
 const int ledPins[4] = {10, 11, 12, 13};  // Up to 4 LEDs on pins 10–13
