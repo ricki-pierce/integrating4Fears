@@ -1,3 +1,26 @@
+"""
+To run this code, QTM (Qualisys Track Manager) must be set up and running on the same PC 
+as the Arduino. The Arduino board must also be connected to this computer. 
+
+First, verify the Arduino code is working, then upload it to the Elegoo Mega2560 R3, 
+which should have up to 4 large buttons connected via a STEMMA QT I2C breakout. 
+
+Make sure QTM is open and ready to record. When you run this script, you will be prompted 
+to enter how many buttons are connected. The GUI will then appear with three buttons: 
+Start Trial, Stop Trial, and End. 
+
+Click 'Start Trial' to begin a trial. QTM will start recording, a beep sound will play, 
+and a random button will light up. When the lit button is pressed, the light will turn off. 
+Click 'Stop Trial' (do not click 'End') to stop recording the trial and save results. 
+
+Each button will only be lit once per session. Continue until all trials are completed. 
+When finished, click 'End' to close the GUI and export the results. The Excel file 
+will contain the times when each button was pressed and released, along with the duration 
+each button was held.
+"""
+
+
+
 # --- Integrated QTM + Arduino (Seesaw Buttons) + Excel Logger ---
 # This program controls trials using an Arduino (with button inputs + LEDs),
 # records data from QTM motion capture, plays beeps, and saves everything to Excel.
