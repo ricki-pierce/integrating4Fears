@@ -1,3 +1,19 @@
+/*
+  This Arduino code requires the Adafruit Seesaw and Adafruit BusIO libraries to be installed 
+  in the Arduino IDE (can be installed via Library Manager). 
+
+  The push buttons and LEDs should be assembled according to Adafruit’s guidelines. 
+  The Seesaw pins corresponding to the buttons and LEDs are fixed and should not be changed 
+  unless you intentionally want to deactivate them. 
+
+  LEDs are set to full brightness by default (255). To make them dimmer, you can change the 
+  255 values to any number between 0 (off) and 255 (full brightness).
+
+  This sketch works together with accompanying Python code, which controls when the LEDs 
+  turn on and off based on input from the buttons or other events.
+*/
+
+
 // Include the Adafruit Seesaw library, which lets the Arduino talk to the Seesaw chip
 #include "Adafruit_seesaw.h"
 
