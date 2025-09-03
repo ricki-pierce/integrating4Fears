@@ -129,6 +129,7 @@ def read_serial():
             arduino_ms = int(parts[1])  # Time from Arduino in ms
             system_time = datetime.now().strftime('%H:%M:%S.%f')[:-3]  # Current computer time
 
+            #event log uses the computer’s timestamp (system_time) to record when the button press/release occurred
             # Handle button press
             if "_pressed" in event:
                 button = event.split("_")[1]  # Extract button number
