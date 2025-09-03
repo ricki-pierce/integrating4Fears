@@ -1,156 +1,173 @@
 # --- Integrated QTM + Arduino (Seesaw Buttons) + Excel Logger ---
+# This program controls trials using an Arduino (with button inputs + LEDs),
+# records data from QTM motion capture, plays beeps, and saves everything to Excel.
 
-import asyncio
-import threading
-import serial
-import time
-import random
-import numpy as np
-import sounddevice as sd
-import tkinter as tk
-from tkinter import simpledialog, messagebox
-from openpyxl import Workbook
-from datetime import datetime
-import qtm
-import os
-import soundfile as sf
+# Import required libraries
+import asyncio          # For running asynchronous tasks (QTM + trial control)
+import threading        # To run background tasks (like serial reader + event loop)
+import serial           # For communicating with Arduino over USB/serial
+import time             # For delays
+import random           # For choosing random buttons
+import numpy as np      # For handling audio data arrays
+import sounddevice as sd # For playing sounds
+import tkinter as tk    # For building a simple graphical user interface
+from tkinter import simpledialog, messagebox  # GUI popups for input and alerts
+from openpyxl import Workbook  # For saving results to Excel
+from datetime import datetime  # For timestamps
+import qtm             # For connecting to QTM motion capture system
+import os              # For working with files and directories
+import soundfile as sf  # For reading audio files
 
 # ------------------ CONFIG ------------------
-SERIAL_PORT = 'COM10'    # change if Arduino is on different port
-BAUD_RATE = 115200       # match your Seesaw sketch
-WORK_DIR = r"C:\Users\AoMV Lab\ricki projects"
-os.chdir(WORK_DIR)
+SERIAL_PORT = 'COM10'    # Port where Arduino is connected (change if needed)
+BAUD_RATE = 115200       # Speed of serial communication (must match Arduino sketch)
+WORK_DIR = r"C:\Users\AoMV Lab\ricki projects"  # Folder to save Excel logs
+os.chdir(WORK_DIR)       # Change working directory to the above path
 
 # ------------------ GLOBALS ------------------
-qtm_connection = None
-loop = asyncio.new_event_loop()
+qtm_connection = None                # Holds the QTM connection object
+loop = asyncio.new_event_loop()      # Create a new asynchronous event loop
 
+# Connect to Arduino
 arduino = serial.Serial(port=SERIAL_PORT, baudrate=BAUD_RATE, timeout=1)
-time.sleep(2)  # wait for Arduino reset
+time.sleep(2)  # Wait a moment for Arduino to reset after connecting
 
-event_log = []     # list of (trial, button, system_time, event, duration)
-press_times = {}   # track button press times
-trial_number = 0
-button_pool = []   # buttons available for random choice
-current_button = None
-num_buttons = 0
+# Data storage
+event_log = []     # Stores logs of all events: (trial, button, timestamp, event, duration)
+press_times = {}   # Keeps track of button press times to calculate duration
+trial_number = 0   # Counter for trials
+button_pool = []   # Buttons available to be chosen at random
+current_button = None # Button currently active (lit up)
+num_buttons = 0    # How many buttons are connected (user sets this at start)
 
 # ------------------ EVENT LOOP ------------------
 def start_event_loop():
+    """Start the asyncio event loop so async tasks can run in background."""
     asyncio.set_event_loop(loop)
     loop.run_forever()
 
+# Run event loop in a background thread
 threading.Thread(target=start_event_loop, daemon=True).start()
 
 # ------------------ QTM CONTROL ------------------
 async def start_qtm_recording():
+    """Connect to QTM and start recording."""
     global qtm_connection
     try:
-        qtm_connection = await qtm.connect("127.0.0.1")
+        qtm_connection = await qtm.connect("127.0.0.1")  # Connect to QTM on local machine
         print("Connected to QTM.")
-        await qtm_connection.take_control("")
-        await qtm_connection.start()
+        await qtm_connection.take_control("")  # Take control of QTM
+        await qtm_connection.start()           # Start recording
         print("Recording started.")
     except Exception as e:
         print(f"Failed to start QTM recording: {e}")
         qtm_connection = None
 
 async def stop_qtm_recording():
+    """Stop QTM recording and disconnect."""
     global qtm_connection
     if qtm_connection:
         try:
-            await qtm_connection.stop()
+            await qtm_connection.stop()   # Stop recording
             print("Recording stopped.")
-            qtm_connection.disconnect()
+            qtm_connection.disconnect()   # Disconnect
             print("Disconnected from QTM.")
             qtm_connection = None
         except Exception as e:
             print(f"Failed to stop QTM recording: {e}")
+            # If stopping fails, show an error popup
             def show_error():
                 messagebox.showerror("Error", "Failed to stop recording.")
             root.after(0, show_error)
 
 # ------------------ BEEP ------------------
 def play_beep_blocking():
+    """Play a beep sound (blocking until finished)."""
     filename = r"C:\Users\AoMV Lab\ricki projects\Silenceplus500hz1000mstone.wav"
-    data, fs = sf.read(filename, dtype='float32')
-    sd.play(data, fs)
-    sd.wait()
+    data, fs = sf.read(filename, dtype='float32')  # Load sound file
+    sd.play(data, fs)   # Play sound
+    sd.wait()           # Wait until playback finishes
 
 # ------------------ SERIAL READER ------------------
 def read_serial():
+    """Continuously read button press/release events from Arduino."""
     global trial_number, current_button
     while True:
-        if arduino.in_waiting > 0:
-            line = arduino.readline().decode(errors='ignore').strip()
+        if arduino.in_waiting > 0:  # If there’s data waiting
+            line = arduino.readline().decode(errors='ignore').strip()  # Read one line
             if not line:
                 continue
 
-            parts = line.split()
+            parts = line.split()  # Expect "event time"
             if len(parts) != 2:
                 continue
 
-            event = parts[0]
-            arduino_ms = int(parts[1])
-            system_time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+            event = parts[0]        # e.g. "btn1_pressed"
+            arduino_ms = int(parts[1])  # Time from Arduino in ms
+            system_time = datetime.now().strftime('%H:%M:%S.%f')[:-3]  # Current computer time
 
+            # Handle button press
             if "_pressed" in event:
-                button = event.split("_")[1]
-                press_times[button] = arduino_ms
+                button = event.split("_")[1]  # Extract button number
+                press_times[button] = arduino_ms  # Save press time
                 event_text = f"#{button} - pressed"
                 event_log.append((trial_number, current_button, system_time, event_text, None))
                 print(f"[Trial {trial_number}] Button {current_button} [{system_time}] {event_text}")
 
-                # Turn off LED when button pressed
+                # Turn off LED once button is pressed
                 if current_button is not None:
                     arduino.write(f"LED_{current_button}_OFF\n".encode())
 
+            # Handle button release
             elif "_released" in event:
                 button = event.split("_")[1]
                 if button in press_times:
-                    duration = arduino_ms - press_times[button]
+                    duration = arduino_ms - press_times[button]  # How long button was held
                     event_text = f"#{button} - released"
                     event_log.append((trial_number, current_button, system_time, event_text, duration))
                     print(f"[Trial {trial_number}] Button {current_button} [{system_time}] {event_text} (Duration: {duration} ms)")
-                    del press_times[button]
+                    del press_times[button]  # Remove since released
 
+# Start serial reader in background thread
 serial_thread = threading.Thread(target=read_serial, daemon=True)
 serial_thread.start()
 
 # ------------------ TRIAL CONTROL ------------------
 async def start_recording_and_trial():
+    """Start a trial: record QTM, play beep, and light up random button."""
     global trial_number, current_button, button_pool
 
-    if not button_pool:
+    if not button_pool:  # No buttons left to use
         messagebox.showinfo("Done", "All buttons have been used.")
         return
 
     trial_number += 1
-    await start_qtm_recording()
-    if qtm_connection is None:
+    await start_qtm_recording()  # Start QTM
+    if qtm_connection is None:   # If connection failed, show error
         def show_error():
             messagebox.showerror("Error", "Failed to start recording.")
         root.after(0, show_error)
         return
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(2)  # Small delay before beep
 
-    # --- Choose random button ---
+    # Choose a random button and remove it from pool
     current_button = random.choice(button_pool)
     button_pool.remove(current_button)
 
-    # --- Start beep ---
+    # Play beep in separate thread so it doesn’t block
     beep_thread = threading.Thread(target=play_beep_blocking, daemon=True)
     beep_thread.start()
 
-    # --- Wait before LED on ---
+    # Wait before lighting LED
     await asyncio.sleep(1.0)
     command = f"LED_{current_button}_ON\n"
-    arduino.write(command.encode())
+    arduino.write(command.encode())  # Send command to Arduino
     arduino.flush()
 
     print(f"Trial {trial_number}: Beep played & Button {current_button} lit")
 
+# GUI button actions
 def on_start_button():
     asyncio.run_coroutine_threadsafe(start_recording_and_trial(), loop)
 
@@ -158,26 +175,29 @@ def on_stop_trial_button():
     asyncio.run_coroutine_threadsafe(stop_qtm_recording(), loop)
 
 def on_end_button():
-    export_to_excel()
-    loop.call_soon_threadsafe(loop.stop)
-    root.destroy()
+    export_to_excel()              # Save results
+    loop.call_soon_threadsafe(loop.stop)  # Stop async loop
+    root.destroy()                 # Close GUI
 
 # ------------------ EXCEL EXPORT ------------------
 def export_to_excel():
+    """Save all logged events to Excel file."""
     if not event_log:
         messagebox.showwarning("No Data", "No events to export.")
         return
 
-    wb = Workbook()
+    wb = Workbook()       # Create new workbook
     ws = wb.active
-    ws.title = "Trials"
+    ws.title = "Trials"   # Rename sheet
 
+    # Column headers
     ws['A1'] = 'Trial'
     ws['B1'] = 'Button Lit'
     ws['C1'] = 'Timestamp'
     ws['D1'] = 'Event'
     ws['E1'] = 'Duration (ms)'
 
+    # Write each event to Excel
     for idx, (trial, button, timestamp, event, duration) in enumerate(event_log, start=2):
         ws[f"A{idx}"] = trial
         ws[f"B{idx}"] = button
@@ -186,21 +206,24 @@ def export_to_excel():
         if duration is not None:
             ws[f"E{idx}"] = duration
 
+    # Save with timestamped filename
     filename = f"trial_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     wb.save(filename)
     messagebox.showinfo("Export Successful", f"Saved as {filename}")
 
 # ------------------ GUI ------------------
 def build_gui():
+    """Build the graphical interface for controlling trials."""
     global root, num_buttons, button_pool
 
-    root = tk.Tk()
+    root = tk.Tk()  # Create window
     root.title("QTM + Seesaw Trial Controller")
 
-    # ask number of buttons at startup
+    # Ask user how many buttons are connected (1–4)
     num_buttons = simpledialog.askinteger("Setup", "How many Seesaw buttons are connected? (1-4)", minvalue=1, maxvalue=4)
-    button_pool = list(range(1, num_buttons + 1))
+    button_pool = list(range(1, num_buttons + 1))  # Initialize button pool
 
+    # Add buttons to GUI
     start_btn = tk.Button(root, text="Start Trial", command=on_start_button, width=25, height=3)
     start_btn.pack(pady=10, padx=20)
 
@@ -210,9 +233,10 @@ def build_gui():
     end_btn = tk.Button(root, text="End & Save", command=on_end_button, width=25, height=3)
     end_btn.pack(pady=10, padx=20)
 
+    # Handle window close (same as pressing "End & Save")
     root.protocol("WM_DELETE_WINDOW", on_end_button)
     root.mainloop()
 
 # ------------------ MAIN ------------------
 if __name__ == "__main__":
-    build_gui()
+    build_gui()  # Start program by opening GUI
