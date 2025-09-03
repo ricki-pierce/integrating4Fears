@@ -129,9 +129,15 @@ async def stop_qtm_recording():
 def play_beep_blocking():
     """Play a beep sound (blocking until finished)."""
     filename = r"C:\Users\AoMV Lab\ricki projects\Silenceplus500hz1000mstone.wav"
-    data, fs = sf.read(filename, dtype='float32')  # Load sound file
-    sd.play(data, fs)   # Play sound
-    sd.wait()           # Wait until playback finishes
+    data, fs = sf.read(filename, dtype='float32')
+    
+    # Log beep actually starting
+    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+                      "Beep Started", None))
+    
+    sd.play(data, fs)
+    sd.wait()
+
 
 # ------------------ SERIAL READER ------------------
 def read_serial():
@@ -163,7 +169,13 @@ def read_serial():
 
                 # Turn off LED once button is pressed
                 if current_button is not None:
+                    # Log LED off command
+                    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+                                      f"LED_{current_button}_OFF Command Sent", None))
                     arduino.write(f"LED_{current_button}_OFF\n".encode())
+                    # Log LED actually turned off (approximation)
+                    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+                                          f"LED_{current_button}_Turned Off", None))
 
             # Handle button release
             elif "_released" in event:
@@ -189,12 +201,21 @@ async def start_recording_and_trial():
         return
 
     trial_number += 1
+    
+    # Log QTM start command
+    event_log.append((trial_number, None, now_central().strftime('%H:%M:%S.%f')[:-3],
+                      "QTM Start Command Sent", None)) 
+    
     await start_qtm_recording()  # Start QTM
     if qtm_connection is None:   # If connection failed, show error
         def show_error():
             messagebox.showerror("Error", "Failed to start recording.")
         root.after(0, show_error)
         return
+        
+    # Log QTM actually started
+    event_log.append((trial_number, None, now_central().strftime('%H:%M:%S.%f')[:-3],
+                      "QTM Recording Started", None))
 
     await asyncio.sleep(2)  # Small delay before beep
 
@@ -202,15 +223,29 @@ async def start_recording_and_trial():
     current_button = random.choice(button_pool)
     button_pool.remove(current_button)
 
+
+    # Before starting beep thread
+    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+                  "Beep Command Sent", None))
+ 
     # Play beep in separate thread so it doesn’t block
     beep_thread = threading.Thread(target=play_beep_blocking, daemon=True)
     beep_thread.start()
 
     # Wait before lighting LED
     await asyncio.sleep(1.0)
+    
+    # Command to turn on LED
+    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+                      f"LED_{current_button}_ON Command Sent", None))
+    
     command = f"LED_{current_button}_ON\n"
-    arduino.write(command.encode())  # Send command to Arduino
+    arduino.write(command.encode())
     arduino.flush()
+    
+    # Log LED actually lit (approximation if no Arduino confirmation)
+    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+                      f"LED_{current_button}_Lit", None))
 
     print(f"Trial {trial_number}: Beep played & Button {current_button} lit")
 
