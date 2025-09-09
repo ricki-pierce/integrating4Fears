@@ -279,8 +279,17 @@ def export_to_excel():
     ws['D1'] = 'Event'
     ws['E1'] = 'Duration (ms)'
 
+    # Filter out unwanted events
+    exclude_phrases = [
+        "Beep Command Sent",
+        "LED_",  # Covers both ON/OFF Command Sent and Turned Off/Lit events
+    ]
+
     # Write each event to Excel
     for idx, (trial, button, timestamp, event, duration) in enumerate(event_log, start=2):
+        # Skip excluded events
+        if any(phrase in event for phrase in exclude_phrases):
+            continue
         ws[f"A{idx}"] = trial
         ws[f"B{idx}"] = button
         ws[f"C{idx}"] = timestamp
