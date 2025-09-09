@@ -263,7 +263,7 @@ def on_end_button():
 
 # ------------------ EXCEL EXPORT ------------------
 def export_to_excel():
-    """Save all logged events to Excel file."""
+    """Save all logged events to Excel file (filtered)."""
     if not event_log:
         messagebox.showwarning("No Data", "No events to export.")
         return
@@ -279,28 +279,33 @@ def export_to_excel():
     ws['D1'] = 'Event'
     ws['E1'] = 'Duration (ms)'
 
-    # Filter out unwanted events
-    exclude_phrases = [
+    # Exact phrases we want to exclude
+    exclude_events = [
         "Beep Command Sent",
-        "LED_",  # Covers both ON/OFF Command Sent and Turned Off/Lit events
+        "LED_1_ON Command Sent", "LED_2_ON Command Sent", "LED_3_ON Command Sent", "LED_4_ON Command Sent",
+        "LED_1_OFF Command Sent", "LED_2_OFF Command Sent", "LED_3_OFF Command Sent", "LED_4_OFF Command Sent",
+        "LED_1_Turned Off", "LED_2_Turned Off", "LED_3_Turned Off", "LED_4_Turned Off",
     ]
 
-    # Write each event to Excel
-    for idx, (trial, button, timestamp, event, duration) in enumerate(event_log, start=2):
+    row_idx = 2
+    for trial, button, timestamp, event, duration in event_log:
         # Skip excluded events
-        if any(phrase in event for phrase in exclude_phrases):
+        if event in exclude_events:
             continue
-        ws[f"A{idx}"] = trial
-        ws[f"B{idx}"] = button
-        ws[f"C{idx}"] = timestamp
-        ws[f"D{idx}"] = event
+
+        ws[f"A{row_idx}"] = trial
+        ws[f"B{row_idx}"] = button
+        ws[f"C{row_idx}"] = timestamp
+        ws[f"D{row_idx}"] = event
         if duration is not None:
-            ws[f"E{idx}"] = duration
+            ws[f"E{row_idx}"] = duration
+        row_idx += 1
 
     # Save with timestamped filename
     filename = f"trial_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     wb.save(filename)
     messagebox.showinfo("Export Successful", f"Saved as {filename}")
+
 
 # ------------------ GUI ------------------
 def build_gui():
