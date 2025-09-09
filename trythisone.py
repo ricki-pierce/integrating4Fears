@@ -279,20 +279,17 @@ def export_to_excel():
     ws['D1'] = 'Event'
     ws['E1'] = 'Duration (ms)'
 
-    # Exact phrases we want to exclude
-    exclude_events = [
-        "Beep Command Sent",
-        "LED_1_ON Command Sent", "LED_2_ON Command Sent", "LED_3_ON Command Sent", "LED_4_ON Command Sent",
-        "LED_1_OFF Command Sent", "LED_2_OFF Command Sent", "LED_3_OFF Command Sent", "LED_4_OFF Command Sent",
-        "LED_1_Turned Off", "LED_2_Turned Off", "LED_3_Turned Off", "LED_4_Turned Off",
-    ]
-
     row_idx = 2
     for trial, button, timestamp, event, duration in event_log:
-        # Skip excluded events
-        if event in exclude_events:
+        # --- filtering rules ---
+        if event == "Beep Command Sent":
+            continue
+        if "LED_" in event and "Command Sent" in event:
+            continue
+        if "LED_" in event and "Turned Off" in event:
             continue
 
+        # --- keep everything else ---
         ws[f"A{row_idx}"] = trial
         ws[f"B{row_idx}"] = button
         ws[f"C{row_idx}"] = timestamp
@@ -305,6 +302,7 @@ def export_to_excel():
     filename = f"trial_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     wb.save(filename)
     messagebox.showinfo("Export Successful", f"Saved as {filename}")
+
 
 
 # ------------------ GUI ------------------
