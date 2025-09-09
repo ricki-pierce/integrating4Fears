@@ -170,12 +170,12 @@ def read_serial():
                 # Turn off LED once button is pressed
                 if current_button is not None:
                     # Log LED off command
-                    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
-                                      f"LED_{current_button}_OFF Command Sent", None))
+                    # event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+                    #                   f"LED_{current_button}_OFF Command Sent", None))
                     arduino.write(f"LED_{current_button}_OFF\n".encode())
                     # Log LED actually turned off (approximation)
-                    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
-                                          f"LED_{current_button}_Turned Off", None))
+                    # event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+                    #                       f"LED_{current_button}_Turned Off", None))
 
             # Handle button release
             elif "_released" in event:
@@ -236,8 +236,8 @@ async def start_recording_and_trial():
     await asyncio.sleep(1.0)
     
     # Command to turn on LED
-    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
-                      f"LED_{current_button}_ON Command Sent", None))
+    # event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+    #                   f"LED_{current_button}_ON Command Sent", None))
     
     command = f"LED_{current_button}_ON\n"
     arduino.write(command.encode())
@@ -263,7 +263,7 @@ def on_end_button():
 
 # ------------------ EXCEL EXPORT ------------------
 def export_to_excel():
-    """Save all logged events to Excel file (filtered)."""
+    """Save all logged events to Excel file."""
     if not event_log:
         messagebox.showwarning("No Data", "No events to export.")
         return
@@ -279,31 +279,19 @@ def export_to_excel():
     ws['D1'] = 'Event'
     ws['E1'] = 'Duration (ms)'
 
-    row_idx = 2
-    for trial, button, timestamp, event, duration in event_log:
-        # --- filtering rules ---
-        if event == "Beep Command Sent":
-            continue
-        if "LED_" in event and "Command Sent" in event:
-            continue
-        if "LED_" in event and "Turned Off" in event:
-            continue
-
-        # --- keep everything else ---
-        ws[f"A{row_idx}"] = trial
-        ws[f"B{row_idx}"] = button
-        ws[f"C{row_idx}"] = timestamp
-        ws[f"D{row_idx}"] = event
+    # Write each event to Excel
+    for idx, (trial, button, timestamp, event, duration) in enumerate(event_log, start=2):
+        ws[f"A{idx}"] = trial
+        ws[f"B{idx}"] = button
+        ws[f"C{idx}"] = timestamp
+        ws[f"D{idx}"] = event
         if duration is not None:
-            ws[f"E{row_idx}"] = duration
-        row_idx += 1
+            ws[f"E{idx}"] = duration
 
     # Save with timestamped filename
     filename = f"trial_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     wb.save(filename)
     messagebox.showinfo("Export Successful", f"Saved as {filename}")
-
-
 
 # ------------------ GUI ------------------
 def build_gui():
