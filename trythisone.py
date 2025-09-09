@@ -225,8 +225,8 @@ async def start_recording_and_trial():
 
 
     # Before starting beep thread
-    event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
-                  "Beep Command Sent", None))
+    # event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+    #               "Beep Command Sent", None))
  
     # Play beep in separate thread so it doesn’t block
     beep_thread = threading.Thread(target=play_beep_blocking, daemon=True)
