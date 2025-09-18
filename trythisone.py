@@ -233,7 +233,7 @@ async def start_recording_and_trial():
     beep_thread.start()
 
     # Wait before lighting LED
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(0.01)
     
     # Command to turn on LED
     # event_log.append((trial_number, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
