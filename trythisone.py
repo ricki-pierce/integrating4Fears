@@ -217,7 +217,7 @@ async def start_recording_and_trial():
     event_log.append((trial_number, None, now_central().strftime('%H:%M:%S.%f')[:-3],
                       "QTM Recording Started", None))
 
-    await asyncio.sleep(2)  # Small delay before beep
+    await asyncio.sleep(0.5)  # Small delay before beep
 
     # Choose a random button and remove it from pool
     current_button = random.choice(button_pool)
