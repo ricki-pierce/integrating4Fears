@@ -1,5 +1,4 @@
 #This code incorporates naming of tasks and trial number automatically in the terminal and in excel. this code does not automatically reset qtm to record a new trial.
-
 import asyncio
 import threading
 import serial
@@ -26,6 +25,7 @@ os.chdir(WORK_DIR)
 filename_beep = r"C:\\Users\\AoMV Lab\\ricki projects\\Silenceplus500hz1000mstone.wav"
 
 # ------------------ TIME SYNC ------------------
+
 def sync_windows_time():
     try:
         output = subprocess.check_output(['w32tm', '/resync'], shell=True, stderr=subprocess.STDOUT, text=True)
@@ -46,15 +46,16 @@ time.sleep(2)
 
 event_log = []
 press_times = {}
-trial_number = 0
 button_pool = []
 current_button = None
 num_buttons = 0
 
 # Task management
-tasks = []          # list of dicts: {name, uses_arduino}
+tasks = []
 selected_task = None
 arduino_task_chosen = False
+# Per-task trial counter
+task_trial_counts = {}
 
 # ------------------ EVENT LOOP ------------------
 def start_event_loop():
@@ -93,14 +94,17 @@ async def stop_qtm_recording():
 
 # ------------------ BEEP ------------------
 def play_beep_blocking(task_name, uses_arduino):
+    trial_number = task_trial_counts[task_name]
+    measurement_name = f"{task_name}_Trial{trial_number}"
+    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], f"Beep Started", None, uses_arduino))
+    print(f"{measurement_name}: Beep Started")
     data, fs = sf.read(filename_beep, dtype='float32')
-    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], "Beep Started", None, uses_arduino))
     sd.play(data, fs)
     sd.wait()
 
 # ------------------ SERIAL READER ------------------
 def read_serial():
-    global trial_number, current_button
+    global current_button
     while True:
         if arduino.in_waiting > 0:
             line = arduino.readline().decode(errors='ignore').strip()
@@ -117,9 +121,11 @@ def read_serial():
             if "_pressed" in event:
                 button = event.split("_")[1]
                 press_times[button] = arduino_ms
+                trial_number = task_trial_counts[selected_task['name']]
+                measurement_name = f"{selected_task['name']}_Trial{trial_number}"
                 event_text = f"#{button} - pressed"
                 event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, None, selected_task["uses_arduino"]))
-                print(f"[Trial {trial_number}] Button {current_button} [{system_time}] {event_text}")
+                print(f"{measurement_name}: Button {current_button} pressed")
 
                 if current_button is not None:
                     arduino.write(f"LED_{current_button}_OFF\n".encode())
@@ -128,9 +134,11 @@ def read_serial():
                 button = event.split("_")[1]
                 if button in press_times:
                     duration = arduino_ms - press_times[button]
+                    trial_number = task_trial_counts[selected_task['name']]
+                    measurement_name = f"{selected_task['name']}_Trial{trial_number}"
                     event_text = f"#{button} - released"
                     event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, duration, selected_task["uses_arduino"]))
-                    print(f"[Trial {trial_number}] Button {current_button} [{system_time}] {event_text} (Duration: {duration} ms)")
+                    print(f"{measurement_name}: Button {current_button} released (Duration: {duration} ms)")
                     del press_times[button]
 
 serial_thread = threading.Thread(target=read_serial, daemon=True)
@@ -138,7 +146,7 @@ serial_thread.start()
 
 # ------------------ TRIAL CONTROL ------------------
 async def start_recording_and_trial():
-    global trial_number, current_button, button_pool
+    global current_button, button_pool
 
     if selected_task is None:
         messagebox.showwarning("No Task Selected", "Please select a task before starting a trial.")
@@ -147,8 +155,12 @@ async def start_recording_and_trial():
     uses_arduino = selected_task["uses_arduino"]
     task_name = selected_task["name"]
 
-    trial_number += 1
+    # Increment per-task counter
+    task_trial_counts[task_name] += 1
+    trial_number = task_trial_counts[task_name]
+    measurement_name = f"{task_name}_Trial{trial_number}"
 
+    print(f"{measurement_name}: QTM Start Command Sent")
     event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], "QTM Start Command Sent", None, uses_arduino))
 
     await start_qtm_recording()
@@ -158,6 +170,7 @@ async def start_recording_and_trial():
         root.after(0, show_error)
         return
 
+    print(f"{measurement_name}: QTM Recording Started")
     event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], "QTM Recording Started", None, uses_arduino))
 
     await asyncio.sleep(0.5)
@@ -173,14 +186,14 @@ async def start_recording_and_trial():
         current_button = random.choice(button_pool)
         button_pool.remove(current_button)
 
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.49)
         command = f"LED_{current_button}_ON\n"
         arduino.write(command.encode())
         arduino.flush()
         event_log.append((trial_number, task_name, current_button, now_central().strftime('%H:%M:%S.%f')[:-3], f"LED_{current_button}_Lit", None, uses_arduino))
-        print(f"Trial {trial_number} ({task_name}): Beep played & Button {current_button} lit")
+        print(f"{measurement_name}: Beep played & Button {current_button} lit")
     else:
-        print(f"Trial {trial_number} ({task_name}): Beep played (no Arduino)")
+        print(f"{measurement_name}: Beep played (no Arduino)")
 
 # GUI button actions
 def on_start_button():
@@ -228,8 +241,9 @@ def export_to_excel():
 
 # ------------------ TASK SETUP ------------------
 def setup_tasks():
-    global tasks, arduino_task_chosen
+    global tasks, arduino_task_chosen, task_trial_counts
     tasks = []
+    task_trial_counts = {}
     for i in range(1, 9):
         name = simpledialog.askstring("Task Setup", f"Enter name for Task {i}:")
         if not name:
@@ -242,6 +256,7 @@ def setup_tasks():
                 uses_arduino = True
                 arduino_task_chosen = True
         tasks.append({"name": name, "uses_arduino": uses_arduino})
+        task_trial_counts[name] = 0
 
 # ------------------ GUI ------------------
 def build_gui():
@@ -252,12 +267,10 @@ def build_gui():
 
     setup_tasks()
 
-    # If Arduino task exists, ask how many buttons
     if any(t["uses_arduino"] for t in tasks):
         num_buttons = simpledialog.askinteger("Setup", "How many Seesaw buttons are connected? (1-4)", minvalue=1, maxvalue=4)
         button_pool = list(range(1, num_buttons + 1))
 
-    # Dropdown to select task
     task_names = [t["name"] for t in tasks]
     selected_task_var = tk.StringVar(value=task_names[0])
 
@@ -268,7 +281,6 @@ def build_gui():
             if t["name"] == name:
                 selected_task = t
                 break
-
 
     selected_task_var.trace("w", update_selected_task)
     update_selected_task()
