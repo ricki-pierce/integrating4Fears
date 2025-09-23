@@ -1,3 +1,5 @@
+#This code incorporates naming of tasks and trial number automatically in the terminal and in excel. this code does not automatically reset qtm to record a new trial.
+
 import asyncio
 import threading
 import serial
@@ -260,12 +262,13 @@ def build_gui():
     selected_task_var = tk.StringVar(value=task_names[0])
 
     def update_selected_task(*args):
-        nonlocal selected_task
+        global selected_task
         name = selected_task_var.get()
         for t in tasks:
             if t["name"] == name:
                 selected_task = t
                 break
+
 
     selected_task_var.trace("w", update_selected_task)
     update_selected_task()
