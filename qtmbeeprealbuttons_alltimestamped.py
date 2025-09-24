@@ -1,4 +1,6 @@
 """
+This code includes ALL possible initial timestamps aka overkill
+
 To run this code, QTM (Qualisys Track Manager) must be set up and running on the same PC 
 as the Arduino. The Arduino board must also be connected to this computer. 
 
