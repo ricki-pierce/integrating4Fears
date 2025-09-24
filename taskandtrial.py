@@ -35,7 +35,7 @@ BAUD_RATE = 115200
 WORK_DIR = r"C:\\Users\\AoMV Lab\\ricki projects"
 os.chdir(WORK_DIR)
 
-filename_beep = r"C:\\Users\\AoMV Lab\\ricki projects\\Silenceplus500hz1000mstone.wav"
+filename_beep = r"C:\\Users\\AoMV Lab\\ricki projects\\500Hz500mstone.wav"
 
 # ------------------ TIME SYNC ------------------
 
@@ -244,10 +244,11 @@ async def start_recording_and_trial():
     trial_number = task_trial_counts[task_name]
     measurement_name = f"{task_name}_Trial{trial_number}_{subject_id}"
 
-
     print(f"{measurement_name}: QTM Start Command Sent")
-    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], "QTM Start Command Sent", None, uses_arduino, subject_id))
+    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3],
+                      "QTM Start Command Sent", None, uses_arduino, subject_id))
 
+    # --- Start QTM recording ---
     await start_qtm_recording()
     if qtm_connection is None:
         def show_error():
@@ -256,29 +257,42 @@ async def start_recording_and_trial():
         return
 
     print(f"{measurement_name}: QTM Recording Started")
-    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], "QTM Recording Started", None, uses_arduino, subject_id))
+    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3],
+                      "QTM Recording Started", None, uses_arduino, subject_id))
 
+    # --- Wait 500 ms after QTM actually started ---
     await asyncio.sleep(0.5)
 
-    beep_thread = threading.Thread(target=play_beep_blocking, args=(task_name, uses_arduino), daemon=True)
-    beep_thread.start()
+    # --- Play beep + LED together ---
+    def play_beep_and_led():
+        # play new beep file
+        data, fs = sf.read(r"C:\\Users\\AoMV Lab\\ricki projects\\500Hz500mstone.wav", dtype='float32')
+        sd.play(data, fs)
 
-    if uses_arduino:
-        if not button_pool:
-            messagebox.showinfo("Done", "All buttons have been used.")
-            return
+        # Log beep
+        event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3],
+                          "Beep Started", None, uses_arduino, subject_id))
+        print(f"{measurement_name}: Beep Started")
 
-        current_button = random.choice(button_pool)
-        button_pool.remove(current_button)
+        # If Arduino task, light up LED at the same time
+        if uses_arduino:
+            if not button_pool:
+                messagebox.showinfo("Done", "All buttons have been used.")
+                return
+            global current_button
+            current_button = random.choice(button_pool)
+            button_pool.remove(current_button)
 
-        await asyncio.sleep(0.49)
-        command = f"LED_{current_button}_ON\n"
-        arduino.write(command.encode())
-        arduino.flush()
-        event_log.append((trial_number, task_name, current_button, now_central().strftime('%H:%M:%S.%f')[:-3], f"LED_{current_button}_Lit", None, uses_arduino, subject_id))
-        print(f"{measurement_name}: Beep played & Button {current_button} lit")
-    else:
-        print(f"{measurement_name}: Beep played (no Arduino)")
+            command = f"LED_{current_button}_ON\n"
+            arduino.write(command.encode())
+            arduino.flush()
+            event_log.append((trial_number, task_name, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
+                              f"LED_{current_button}_Lit", None, uses_arduino, subject_id))
+            print(f"{measurement_name}: Button {current_button} lit")
+
+    # Run beep + LED in a thread (so it doesn’t block)
+    threading.Thread(target=play_beep_and_led, daemon=True).start()
+
 
 # GUI button actions
 def on_start_button():
