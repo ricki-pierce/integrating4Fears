@@ -142,7 +142,18 @@ async def reset_qtm():
 def play_beep_blocking(task_name, uses_arduino):
     trial_number = task_trial_counts[task_name]
     measurement_name = f"{task_name}_Trial{trial_number}"
-    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], f"Beep Started", None, uses_arduino, None, subject_id))
+    event_log.append((
+        trial_number,
+        task_name,
+        None,  # button
+        now_central().strftime('%H:%M:%S.%f')[:-3],
+        "Beep Started",
+        None,  # duration
+        uses_arduino,
+        None,  # hand_used placeholder
+        subject_id
+    ))
+
     print(f"{measurement_name}: Beep Started")
     data, fs = sf.read(filename_beep, dtype='float32')
     sd.play(data, fs)
@@ -151,35 +162,44 @@ def play_beep_blocking(task_name, uses_arduino):
 # ------------------ HAND ------------------
 
 def ask_hand_used(trial_number, task_name):
-    hand = messagebox.askquestion(
-        "Hand Used", 
-        f"For {task_name} (Trial {trial_number}), which hand did the subject use?\n\nOptions:\n- Left\n- Right\n- N/A",
-        icon="question"
-    )
+    def set_hand(hand_choice):
+        nonlocal chosen_hand
+        chosen_hand = hand_choice
+        hand_window.destroy()
 
-    if hand == "yes":
-        chosen_hand = "Left"
-    else:
-        response = messagebox.askyesnocancel("Hand Used", "Did the subject use the Right hand?\nYes = Right, No = N/A")
-        if response is True:
-            chosen_hand = "Right"
-        elif response is False:
-            chosen_hand = "N/A"
-        else:
-            chosen_hand = "N/A"
+    chosen_hand = "N/A"  # default
+    hand_window = tk.Toplevel(root)
+    hand_window.title("Hand Used")
+    hand_window.geometry("300x150")
+    hand_window.grab_set()  # Make it modal (block interaction with main window)
+
+    label = tk.Label(
+        hand_window,
+        text=f"For {task_name} (Trial {trial_number}), which hand did the subject use?",
+        wraplength=280
+    )
+    label.pack(pady=10)
+
+    btn_frame = tk.Frame(hand_window)
+    btn_frame.pack(pady=10)
+
+    tk.Button(btn_frame, text="Left", width=10, command=lambda: set_hand("Left")).grid(row=0, column=0, padx=5)
+    tk.Button(btn_frame, text="Right", width=10, command=lambda: set_hand("Right")).grid(row=0, column=1, padx=5)
+    tk.Button(btn_frame, text="N/A", width=10, command=lambda: set_hand("N/A")).grid(row=0, column=2, padx=5)
+
+    hand_window.wait_window()  # Wait until closed
 
     timestamp = now_central().strftime('%H:%M:%S.%f')[:-3]
-
-    # Note: added `hand_used` in position before 'duration'
     event_log.append((
-        trial_number, 
-        task_name, 
-        None, 
-        timestamp, 
-        "Hand Used", 
-        None, 
-        selected_task["uses_arduino"], 
-        chosen_hand, subject_id   # <--- NEW field
+        trial_number,
+        task_name,
+        None,
+        timestamp,
+        "Hand Used",
+        None,
+        selected_task["uses_arduino"],
+        chosen_hand,
+        subject_id
     ))
 
     print(f"{task_name}_Trial{trial_number}: Hand Used -> {chosen_hand}")
@@ -208,7 +228,7 @@ def read_serial():
                 trial_number = task_trial_counts[selected_task['name']]
                 measurement_name = f"{selected_task['name']}_Trial{trial_number}"
                 event_text = f"#{button} - pressed"
-                event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, None, selected_task["uses_arduino"], subject_id))
+                event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, None, selected_task["uses_arduino"], None, subject_id))
                 print(f"{measurement_name}: Button {current_button} pressed")
 
                 if current_button is not None:
@@ -221,7 +241,7 @@ def read_serial():
                     trial_number = task_trial_counts[selected_task['name']]
                     measurement_name = f"{selected_task['name']}_Trial{trial_number}"
                     event_text = f"#{button} - released"
-                    event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, duration, selected_task["uses_arduino"], subject_id))
+                    event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, duration, selected_task["uses_arduino"], None, subject_id))
                     print(f"{measurement_name}: Button {current_button} released (Duration: {duration} ms)")
                     del press_times[button]
 
@@ -245,8 +265,18 @@ async def start_recording_and_trial():
     measurement_name = f"{task_name}_Trial{trial_number}_{subject_id}"
 
     print(f"{measurement_name}: QTM Start Command Sent")
-    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3],
-                      "QTM Start Command Sent", None, uses_arduino, subject_id))
+    event_log.append((
+        trial_number,
+        task_name,
+        None,  # button
+        now_central().strftime('%H:%M:%S.%f')[:-3],
+        "QTM Start Command Sent",
+        None,  # duration
+        uses_arduino,
+        None,  # hand_used placeholder
+        subject_id
+    ))
+
 
     # --- Start QTM recording ---
     await start_qtm_recording()
@@ -257,11 +287,21 @@ async def start_recording_and_trial():
         return
 
     print(f"{measurement_name}: QTM Recording Started")
-    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3],
-                      "QTM Recording Started", None, uses_arduino, subject_id))
+    event_log.append((
+        trial_number,
+        task_name,
+        None,  # button
+        now_central().strftime('%H:%M:%S.%f')[:-3],
+        "QTM Recording Started",
+        None,  # duration
+        uses_arduino,
+        None,  # hand_used placeholder
+        subject_id
+    ))
+
 
     # --- Wait 500 ms after QTM actually started ---
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(1.5)
 
     # --- Play beep + LED together ---
     def play_beep_and_led():
@@ -271,7 +311,7 @@ async def start_recording_and_trial():
 
         # Log beep
         event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3],
-                          "Beep Started", None, uses_arduino, subject_id))
+                          "Beep Started", None, uses_arduino, None, subject_id))
         print(f"{measurement_name}: Beep Started")
 
         # If Arduino task, light up LED at the same time
@@ -287,7 +327,8 @@ async def start_recording_and_trial():
             arduino.write(command.encode())
             arduino.flush()
             event_log.append((trial_number, task_name, current_button, now_central().strftime('%H:%M:%S.%f')[:-3],
-                              f"LED_{current_button}_Lit", None, uses_arduino, subject_id))
+                              f"LED_{current_button}_Lit", None, uses_arduino, None, subject_id))
+
             print(f"{measurement_name}: Button {current_button} lit")
 
     # Run beep + LED in a thread (so it doesn’t block)
@@ -329,41 +370,30 @@ def export_to_excel():
     ws = wb.active
     ws.title = "Trials"
 
-    ws['A1'] = 'Trial'
+    ws['A1'] = 'Subject ID'
     ws['B1'] = 'Task Name'
-    ws['C1'] = 'Uses Arduino'
-    ws['D1'] = 'Button Lit'
-    ws['E1'] = 'Timestamp'
-    ws['F1'] = 'Event'
-    ws['G1'] = 'Duration (ms)'
-    ws['H1'] = 'Hand Used'
-    ws['I1'] = 'Subject ID'   # <--- NEW COLUMN
+    ws['C1'] = 'Trial'
+    ws['D1'] = 'Timestamp'
+    ws['E1'] = 'Event'
+    ws['F1'] = 'Hand Used'
+    ws['G1'] = 'Uses Arduino'
+    ws['H1'] = 'Button Lit'
+    ws['I1'] = 'Duration (ms)'
 
 
     for idx, entry in enumerate(event_log, start=2):
-        # Old events may not have hand_used or subject_id
-        if len(entry) == 7:
-            trial, task_name, button, timestamp, event, duration, uses_arduino = entry
-            hand_used = None
-            sid = subject_id
-        elif len(entry) == 8:
-            trial, task_name, button, timestamp, event, duration, uses_arduino, hand_used = entry
-            sid = subject_id
-        else:
+            # unpack the 9-element tuple
             trial, task_name, button, timestamp, event, duration, uses_arduino, hand_used, sid = entry
-    
-        ws[f"A{idx}"] = trial
-        ws[f"B{idx}"] = task_name
-        ws[f"C{idx}"] = "Yes" if uses_arduino else "No"
-        ws[f"D{idx}"] = button
-        ws[f"E{idx}"] = timestamp
-        ws[f"F{idx}"] = event
-        if duration is not None:
-            ws[f"G{idx}"] = duration
-        if hand_used is not None:
-            ws[f"H{idx}"] = hand_used
-        ws[f"I{idx}"] = sid
 
+            ws[f"A{idx}"] = sid
+            ws[f"B{idx}"] = task_name
+            ws[f"C{idx}"] = trial
+            ws[f"D{idx}"] = timestamp
+            ws[f"E{idx}"] = event
+            ws[f"F{idx}"] = hand_used
+            ws[f"G{idx}"] = "Yes" if uses_arduino else "No"
+            ws[f"H{idx}"] = button
+            ws[f"I{idx}"] = duration
 
     filename = f"trial_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{subject_id}.xlsx"
     wb.save(filename)
