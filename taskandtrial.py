@@ -70,6 +70,9 @@ arduino_task_chosen = False
 # Per-task trial counter
 task_trial_counts = {}
 
+# Subject ID
+subject_id = None
+
 # ------------------ EVENT LOOP ------------------
 def start_event_loop():
     asyncio.set_event_loop(loop)
@@ -111,7 +114,7 @@ async def save_qtm_recording():
         try:
             task_name = selected_task["name"]
             trial_number = task_trial_counts[task_name]
-            measurement_name = f"{task_name}_Trial{trial_number}"
+            measurement_name = f"{task_name}_Trial{trial_number}_{subject_id}"
             await qtm_connection.save(measurement_name, overwrite=True)
             print(f"Recording saved as {measurement_name}")
         except Exception as e:
@@ -139,11 +142,49 @@ async def reset_qtm():
 def play_beep_blocking(task_name, uses_arduino):
     trial_number = task_trial_counts[task_name]
     measurement_name = f"{task_name}_Trial{trial_number}"
-    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], f"Beep Started", None, uses_arduino))
+    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], f"Beep Started", None, uses_arduino, None, subject_id))
     print(f"{measurement_name}: Beep Started")
     data, fs = sf.read(filename_beep, dtype='float32')
     sd.play(data, fs)
     sd.wait()
+    
+# ------------------ HAND ------------------
+
+def ask_hand_used(trial_number, task_name):
+    hand = messagebox.askquestion(
+        "Hand Used", 
+        f"For {task_name} (Trial {trial_number}), which hand did the subject use?\n\nOptions:\n- Left\n- Right\n- N/A",
+        icon="question"
+    )
+
+    if hand == "yes":
+        chosen_hand = "Left"
+    else:
+        response = messagebox.askyesnocancel("Hand Used", "Did the subject use the Right hand?\nYes = Right, No = N/A")
+        if response is True:
+            chosen_hand = "Right"
+        elif response is False:
+            chosen_hand = "N/A"
+        else:
+            chosen_hand = "N/A"
+
+    timestamp = now_central().strftime('%H:%M:%S.%f')[:-3]
+
+    # Note: added `hand_used` in position before 'duration'
+    event_log.append((
+        trial_number, 
+        task_name, 
+        None, 
+        timestamp, 
+        "Hand Used", 
+        None, 
+        selected_task["uses_arduino"], 
+        chosen_hand, subject_id   # <--- NEW field
+    ))
+
+    print(f"{task_name}_Trial{trial_number}: Hand Used -> {chosen_hand}")
+
+
 
 # ------------------ SERIAL READER ------------------
 def read_serial():
@@ -167,7 +208,7 @@ def read_serial():
                 trial_number = task_trial_counts[selected_task['name']]
                 measurement_name = f"{selected_task['name']}_Trial{trial_number}"
                 event_text = f"#{button} - pressed"
-                event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, None, selected_task["uses_arduino"]))
+                event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, None, selected_task["uses_arduino"], subject_id))
                 print(f"{measurement_name}: Button {current_button} pressed")
 
                 if current_button is not None:
@@ -180,7 +221,7 @@ def read_serial():
                     trial_number = task_trial_counts[selected_task['name']]
                     measurement_name = f"{selected_task['name']}_Trial{trial_number}"
                     event_text = f"#{button} - released"
-                    event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, duration, selected_task["uses_arduino"]))
+                    event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, duration, selected_task["uses_arduino"], subject_id))
                     print(f"{measurement_name}: Button {current_button} released (Duration: {duration} ms)")
                     del press_times[button]
 
@@ -201,10 +242,11 @@ async def start_recording_and_trial():
     # Increment per-task counter
     task_trial_counts[task_name] += 1
     trial_number = task_trial_counts[task_name]
-    measurement_name = f"{task_name}_Trial{trial_number}"
+    measurement_name = f"{task_name}_Trial{trial_number}_{subject_id}"
+
 
     print(f"{measurement_name}: QTM Start Command Sent")
-    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], "QTM Start Command Sent", None, uses_arduino))
+    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], "QTM Start Command Sent", None, uses_arduino, subject_id))
 
     await start_qtm_recording()
     if qtm_connection is None:
@@ -214,7 +256,7 @@ async def start_recording_and_trial():
         return
 
     print(f"{measurement_name}: QTM Recording Started")
-    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], "QTM Recording Started", None, uses_arduino))
+    event_log.append((trial_number, task_name, None, now_central().strftime('%H:%M:%S.%f')[:-3], "QTM Recording Started", None, uses_arduino, subject_id))
 
     await asyncio.sleep(0.5)
 
@@ -233,7 +275,7 @@ async def start_recording_and_trial():
         command = f"LED_{current_button}_ON\n"
         arduino.write(command.encode())
         arduino.flush()
-        event_log.append((trial_number, task_name, current_button, now_central().strftime('%H:%M:%S.%f')[:-3], f"LED_{current_button}_Lit", None, uses_arduino))
+        event_log.append((trial_number, task_name, current_button, now_central().strftime('%H:%M:%S.%f')[:-3], f"LED_{current_button}_Lit", None, uses_arduino, subject_id))
         print(f"{measurement_name}: Beep played & Button {current_button} lit")
     else:
         print(f"{measurement_name}: Beep played (no Arduino)")
@@ -244,6 +286,12 @@ def on_start_button():
 
 def on_stop_trial_button():
     asyncio.run_coroutine_threadsafe(stop_qtm_recording(), loop)
+
+    # Ask about hand used right after stopping
+    if selected_task:
+        trial_number = task_trial_counts[selected_task["name"]]
+        task_name = selected_task["name"]
+        root.after(100, lambda: ask_hand_used(trial_number, task_name))
 
 def on_save_button():
     asyncio.run_coroutine_threadsafe(save_qtm_recording(), loop)
@@ -274,8 +322,22 @@ def export_to_excel():
     ws['E1'] = 'Timestamp'
     ws['F1'] = 'Event'
     ws['G1'] = 'Duration (ms)'
+    ws['H1'] = 'Hand Used'
+    ws['I1'] = 'Subject ID'   # <--- NEW COLUMN
 
-    for idx, (trial, task_name, button, timestamp, event, duration, uses_arduino) in enumerate(event_log, start=2):
+
+    for idx, entry in enumerate(event_log, start=2):
+        # Old events may not have hand_used or subject_id
+        if len(entry) == 7:
+            trial, task_name, button, timestamp, event, duration, uses_arduino = entry
+            hand_used = None
+            sid = subject_id
+        elif len(entry) == 8:
+            trial, task_name, button, timestamp, event, duration, uses_arduino, hand_used = entry
+            sid = subject_id
+        else:
+            trial, task_name, button, timestamp, event, duration, uses_arduino, hand_used, sid = entry
+    
         ws[f"A{idx}"] = trial
         ws[f"B{idx}"] = task_name
         ws[f"C{idx}"] = "Yes" if uses_arduino else "No"
@@ -284,17 +346,35 @@ def export_to_excel():
         ws[f"F{idx}"] = event
         if duration is not None:
             ws[f"G{idx}"] = duration
+        if hand_used is not None:
+            ws[f"H{idx}"] = hand_used
+        ws[f"I{idx}"] = sid
 
-    filename = f"trial_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    filename = f"trial_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{subject_id}.xlsx"
     wb.save(filename)
     messagebox.showinfo("Export Successful", f"Saved as {filename}")
+
 
 # ------------------ TASK SETUP ------------------
 def setup_tasks():
     global tasks, arduino_task_chosen, task_trial_counts
     tasks = []
     task_trial_counts = {}
-    for i in range(1, 4):
+
+    # Ask user how many tasks they want
+    num_tasks = simpledialog.askinteger(
+        "Task Setup", 
+        "How many tasks will be performed?", 
+        minvalue=1, 
+        maxvalue=50  # you can set a higher cap if needed
+    )
+
+    if not num_tasks:
+        messagebox.showwarning("No Tasks", "No number entered. Defaulting to 1 task.")
+        num_tasks = 1
+
+    for i in range(1, num_tasks + 1):   # use the user’s number
         name = simpledialog.askstring("Task Setup", f"Enter name for Task {i}:")
         if not name:
             name = f"Task {i}"
@@ -305,15 +385,22 @@ def setup_tasks():
             if answer:
                 uses_arduino = True
                 arduino_task_chosen = True
+
         tasks.append({"name": name, "uses_arduino": uses_arduino})
         task_trial_counts[name] = 0
 
 # ------------------ GUI ------------------
 def build_gui():
-    global root, num_buttons, button_pool, selected_task
+    global root, num_buttons, button_pool, selected_task, subject_id
 
     root = tk.Tk()
     root.title("QTM + Seesaw Trial Controller")
+
+    # Ask for Subject ID first
+    subject_id = simpledialog.askstring("Subject ID", "Enter Subject ID (alphanumeric):")
+    if not subject_id:
+        messagebox.showwarning("Missing ID", "No Subject ID entered. Using 'Unknown'.")
+        subject_id = "Unknown"
 
     setup_tasks()
 
