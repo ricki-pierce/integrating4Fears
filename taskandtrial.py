@@ -5,6 +5,11 @@ When run, you will be asked to type in the names of the tasks (cup grabbing, but
 For each task, you will be asked if it involves use of the Arduino. If you answer yes, the question will no longer appear for remaining tasks.
 When you are ready to begin, you will see a dropdown menu at the top of the GUI. Make sure you select the correct task for whatever it is you are about to have the subject do. 
 When you click start, QTM begins recording. 
+When you click stop, QTM stops recording. 
+Be sure to Save Recording after each trial, otherwise, you won't be able to reset QTM.
+After saving, you need to reset so you can begin recording a new trial. 
+The file naming is automatic. This is why you type in the tasks on the frontend. Trial numbers are also automatic. 
+Once you are done recording ALL tasks and ALL trials, click End & Save. This will write an excel sheet with trial number, task name, if a button was lit, timestamps, and event description. 
 """
 
 import asyncio
