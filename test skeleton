@@ -1,0 +1,63 @@
+#Do NOT change anything about this code! This is the basic example for how I can get QTM to automatocally save and reset
+
+import asyncio
+import threading
+import tkinter as tk
+from tkinter import messagebox
+import qtm_rt
+
+# Global connection
+connection = None
+
+# Start asyncio loop in separate thread
+loop = asyncio.new_event_loop()
+threading.Thread(target=loop.run_forever, daemon=True).start()
+
+async def connect_to_qtm():
+    global connection
+    connection = await qtm_rt.connect("127.0.0.1")
+    if connection is None:
+        print("Could not connect to QTM")
+    else:
+        print("Connected to QTM")
+        await connection.take_control(password="your_password_here")
+
+def run_async(coro):
+    """Run an async function in the background loop"""
+    return asyncio.run_coroutine_threadsafe(coro, loop)
+
+# Button functions
+def start_recording():
+    if connection:
+        run_async(connection.start())
+        print("Recording started")
+
+def stop_recording():
+    if connection:
+        run_async(connection.stop())
+        print("Recording stopped")
+
+def save_recording():
+    if connection:
+        # Save inside project, no full path needed
+        run_async(connection.save("MyMeasurement.qtm", overwrite=True))
+        print("Recording saved")
+
+def reset_qtm():
+    if connection:
+        run_async(connection.new())
+        print("QTM reset, ready for new measurement")
+
+# GUI setup
+root = tk.Tk()
+root.title("QTM Controller")
+
+tk.Button(root, text="Start Recording", command=start_recording, width=25).pack(pady=5)
+tk.Button(root, text="Stop Recording", command=stop_recording, width=25).pack(pady=5)
+tk.Button(root, text="Save Recording", command=save_recording, width=25).pack(pady=5)
+tk.Button(root, text="Reset QTM", command=reset_qtm, width=25).pack(pady=5)
+
+# Connect to QTM when program starts
+run_async(connect_to_qtm())
+
+root.mainloop()
