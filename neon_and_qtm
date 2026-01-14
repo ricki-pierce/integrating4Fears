@@ -31,8 +31,8 @@ import pytz
 from pupil_labs.realtime_api.simple import discover_one_device
 neon_device = None
 # ------------------ CONFIG ------------------
-#SERIAL_PORT = 'COM10'
-#BAUD_RATE = 115200
+SERIAL_PORT = 'COM10'
+BAUD_RATE = 115200
 WORK_DIR = r"C:\\Users\\AoMV Lab\\ricki projects"
 os.chdir(WORK_DIR)
 filename_beep = r"C:\\Users\\AoMV Lab\\ricki projects\\500Hz500mstone.wav"
@@ -54,14 +54,14 @@ def now_central():
 # ------------------ GLOBALS ------------------
 qtm_connection = None
 loop = asyncio.new_event_loop()
-#arduino = serial.Serial(port=SERIAL_PORT, baudrate=BAUD_RATE, timeout=1)
+arduino = serial.Serial(port=SERIAL_PORT, baudrate=BAUD_RATE, timeout=1)
 time.sleep(2)
 
 event_log = []
 press_times = {}
 button_pool = []
 current_button = None
-#num_buttons = 0
+num_buttons = 0
 
 # Task management
 tasks = []
@@ -241,7 +241,7 @@ def read_serial():
                     trial_number = task_trial_counts[selected_task['name']]
                     measurement_name = f"{selected_task['name']}_Trial{trial_number}"
                     event_text = f"#{button} - released"
-                    #event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, duration, selected_task["uses_arduino"], None, subject_id))
+                    event_log.append((trial_number, selected_task["name"], current_button, system_time, event_text, duration, selected_task["uses_arduino"], None, subject_id))
                     print(f"{measurement_name}: Button {current_button} released (Duration: {duration} ms)")
                     del press_times[button]
 
