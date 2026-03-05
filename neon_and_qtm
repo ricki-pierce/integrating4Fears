@@ -31,7 +31,7 @@ import pytz
 from pupil_labs.realtime_api.simple import discover_one_device
 neon_device = None
 # ------------------ CONFIG ------------------
-SERIAL_PORT = 'COM10'
+SERIAL_PORT = 'COM6'
 BAUD_RATE = 115200
 WORK_DIR = r"C:\\Users\\AoMV Lab\\ricki projects"
 os.chdir(WORK_DIR)
@@ -290,11 +290,42 @@ async def start_recording_and_trial():
     # --- Start Neon recording if connected ---
     if neon_device:
         try:
+            # Log command sent
+            event_log.append((
+                trial_number,
+                task_name,
+                None,
+                now_central().strftime('%H:%M:%S.%f')[:-3],
+                "Neon Start Command Sent",
+                None,
+                uses_arduino,
+                None,
+                subject_id
+            ))
+
+            print(f"{measurement_name}: Neon Start Command Sent")
+
             # Run Neon recording in a separate thread so GUI/loop isn't blocked
             await asyncio.to_thread(neon_device.recording_start)
-            print(f"Neon recording started")
+
+            # Log actual start
+            event_log.append((
+                trial_number,
+                task_name,
+                None,
+                now_central().strftime('%H:%M:%S.%f')[:-3],
+                "Neon Recording Started",
+                None,
+                uses_arduino,
+                None,
+                subject_id
+            ))
+
+            print(f"{measurement_name}: Neon Recording Started")
+
         except Exception as e:
             print(f"Failed to start Neon recording: {e}")
+
 
     print(f"{measurement_name}: QTM Recording Started")
 
@@ -359,8 +390,42 @@ def on_stop_trial_button():
     async def stop_neon_recording():
         if neon_device:
             try:
+                trial_number = task_trial_counts[selected_task["name"]]
+                task_name = selected_task["name"]
+
+                # Log command sent
+                event_log.append((
+                    trial_number,
+                    task_name,
+                    None,
+                    now_central().strftime('%H:%M:%S.%f')[:-3],
+                    "Neon Stop Command Sent",
+                    None,
+                    selected_task["uses_arduino"],
+                    None,
+                    subject_id
+                ))
+
+                print(f"{task_name}_Trial{trial_number}: Neon Stop Command Sent")
+
+                # Stop + save recording
                 await asyncio.to_thread(neon_device.recording_stop_and_save)
-                print("Neon recording stopped and saved")
+
+                # Log actual stop
+                event_log.append((
+                    trial_number,
+                    task_name,
+                    None,
+                    now_central().strftime('%H:%M:%S.%f')[:-3],
+                    "Neon Recording Stopped",
+                    None,
+                    selected_task["uses_arduino"],
+                    None,
+                    subject_id
+                ))
+
+                print(f"{task_name}_Trial{trial_number}: Neon Recording Stopped")
+
             except Exception as e:
                 print(f"Failed to stop Neon recording: {e}")
                 def show_error():
