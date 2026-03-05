@@ -32,7 +32,7 @@ import pytz
 from pupil_labs.realtime_api.simple import discover_one_device
 neon_device = None
 # ------------------ CONFIG ------------------
-SERIAL_PORT = 'COM10'
+SERIAL_PORT = 'COM6'
 BAUD_RATE = 115200
 WORK_DIR = r"C:\\Users\\AoMV Lab\\ricki projects"
 os.chdir(WORK_DIR)
@@ -302,13 +302,12 @@ async def start_recording_and_trial():
     
             # ✅ CAPTURE PHONE-TO-PC TIME OFFSET
             try:
-                time_offset = await asyncio.to_thread(
-                    lambda: neon_device.get_time_echo_stats()
-                )
-                phone_to_pc_time_offset_ms = time_offset.time_offset_ms.mean
+                offset_result = await asyncio.to_thread(neon_device.estimate_time_offset)
+                phone_to_pc_time_offset_ms = offset_result.time_offset_ms.mean
                 print(f"Phone-to-PC time offset: {phone_to_pc_time_offset_ms} ms")
             except Exception as e:
                 print(f"Could not get time offset: {e}")
+                phone_to_pc_time_offset_ms = None
     
         except Exception as e:
             print(f"Failed to start Neon recording: {e}")
@@ -517,6 +516,7 @@ def build_gui():
             neon_device = discover_one_device(max_search_duration_seconds=10)
             if neon_device:
                 print("Neon device connected")
+                print(dir(neon_device))  # ✅ ADD THIS LINE TEMPORARILY
             else:
                 print("No Neon device found")
 
