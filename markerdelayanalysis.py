@@ -250,14 +250,15 @@ for trial in trials:
     pc_time_qtm_start_ms       = metadata["pc_time_qtm_start_ms"]
     phone_to_pc_time_offset_ms = metadata["phone_to_pc_time_offset_ms"]
 
-    # --- Load Pupil recording and get first eye frame UTC timestamp ---
+    # --- Load Pupil recording and get first scene frame UTC timestamp ---
     # (Replicating colleague's exact approach)
     recording = nr.open(trial["neon_recording_path"])
-    first_eye_frame_utc_ms = recording.eye.time[0] / 1e6  # convert microseconds → milliseconds
+    first_scene_frame_utc_ms = recording.scene.time[0] / 1e6  # convert microseconds → milliseconds
+    
 
     # --- Calculate Neon impact time on PHONE clock ---
     ms_per_neon_frame = 1000 / trial["neon_fps"]   # e.g. 5ms at 200Hz
-    impact_time_phone_ms = first_eye_frame_utc_ms + (trial["frame_of_impact_neon"] * ms_per_neon_frame)
+    impact_time_phone_ms = first_scene_frame_utc_ms + (trial["frame_of_impact_neon"] * ms_per_neon_frame)
 
     # --- Convert Neon impact time to PC clock ---
     # (same as colleague: add the laptop_to_neon_time_offset)
@@ -273,7 +274,7 @@ for trial in trials:
 
     results.append({
         "trial_id":                  trial_id,
-        "first_eye_frame_utc_ms":    first_eye_frame_utc_ms,
+        "first_scene_frame_utc_ms":    first_scene_frame_utc_ms,
         "impact_time_phone_ms":      impact_time_phone_ms,
         "impact_time_pc_neon_ms":    impact_time_pc_neon_ms,
         "impact_time_pc_qtm_ms":     impact_time_pc_qtm_ms,
@@ -282,8 +283,8 @@ for trial in trials:
 
     print(f"[{trial_id}] QTM impact (PC clock): {impact_time_pc_qtm_ms:.2f} ms")
     print(f"[{trial_id}] Neon impact (PC clock): {impact_time_pc_neon_ms:.2f} ms")
-    print(f"[{trial_id}] Offset (QTM - Neon):    {offset_ms:.2f} ms\n")
-
+    print(f"[{trial_id}] Offset (QTM - Neon):    {offset_ms:.2f} ms")
+    print(f"[{trial_id}] First Scene Frame:    {first_scene_frame_utc_ms:.2f} ms\n")
 # ─────────────────────────────────────────────
 # SUMMARY STATISTICS
 # ─────────────────────────────────────────────
