@@ -89,6 +89,7 @@ async def start_qtm_recording():
         if qtm_connection is None:
             qtm_connection = await qtm.connect("127.0.0.1")
             print("Connected to QTM.")
+            #print(dir(qtm_connection))
             await qtm_connection.take_control("")
 
         await qtm_connection.start()
@@ -135,7 +136,7 @@ async def send_test_trigger():
     if qtm_connection:
         try:
             # Create QTM event marker
-            await qtm_connection.send_event("TEST_TRIGGER")
+            await qtm_connection.set_qtm_event("TEST_TRIGGER")
 
             print("QTM trigger sent")
 
@@ -326,9 +327,9 @@ async def start_recording_and_trial():
     ))
 
     # --- Start Neon FIRST (so sensor boots before QTM begins capturing) ---
-        phone_to_pc_time_offset_ms = None  # default if Neon not connected
+    phone_to_pc_time_offset_ms = None  # default if Neon not connected
     
-        if neon_device:
+    if neon_device:
             try:
                 await asyncio.to_thread(neon_device.recording_start)
                 print("Neon recording started")
@@ -345,23 +346,23 @@ async def start_recording_and_trial():
                 print(f"Failed to start Neon recording: {e}")
     
         # --- Give Neon time to finish booting its sensor before QTM starts ---
-        await asyncio.sleep(1.5)
+    await asyncio.sleep(1.5)
     
         # --- Now start QTM ---
-        await start_qtm_recording()
+    await start_qtm_recording()
     
-        if qtm_connection is None:
+    if qtm_connection is None:
             def show_error():
                 messagebox.showerror("Error", "Failed to start recording.")
             root.after(0, show_error)
             return
     
         # Capture QTM start time IMMEDIATELY after start confirmation
-        pc_time_qtm_start_ms = time.time() * 1000
-        print(f"QTM start time captured: {pc_time_qtm_start_ms}")
+    pc_time_qtm_start_ms = time.time() * 1000
+    print(f"QTM start time captured: {pc_time_qtm_start_ms}")
     
         # --- Write metadata.json for this trial ---
-        metadata = {
+    metadata = {
             "subject_id": subject_id,
             "task_name": task_name,
             "trial_number": trial_number,
@@ -370,15 +371,15 @@ async def start_recording_and_trial():
             "measurement_name": measurement_name
         }
     
-        metadata_filename = os.path.join(
+    metadata_filename = os.path.join(
             WORK_DIR,
             f"metadata_{task_name}_Trial{trial_number}_{subject_id}.json"
         )
     
-        with open(metadata_filename, "w") as f:
+    with open(metadata_filename, "w") as f:
             json.dump(metadata, f, indent=4)
     
-        print(f"Metadata saved: {metadata_filename}")
+    print(f"Metadata saved: {metadata_filename}")
 
     print(f"{measurement_name}: QTM Recording Started")
 
