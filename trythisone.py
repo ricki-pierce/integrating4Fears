@@ -109,6 +109,52 @@ async def stop_qtm_recording():
                 messagebox.showerror("Error", "Failed to stop recording.")
             root.after(0, show_error)
 
+# ------------------ TEST TRIGGER ------------------
+
+async def send_test_trigger():
+    global qtm_connection, neon_device
+
+    timestamp = now_central().strftime('%H:%M:%S.%f')[:-3]
+
+    print(f"TEST TRIGGER fired at {timestamp}")
+
+    # Log locally
+    event_log.append((
+        task_trial_counts[selected_task["name"]],
+        selected_task["name"],
+        None,
+        timestamp,
+        "TEST_TRIGGER",
+        None,
+        selected_task["uses_arduino"],
+        None,
+        subject_id
+    ))
+
+    # ---------------- QTM MARKER ----------------
+    if qtm_connection:
+        try:
+            # Create QTM event marker
+            await qtm_connection.send_event("TEST_TRIGGER")
+
+            print("QTM trigger sent")
+
+        except Exception as e:
+            print(f"Failed to send QTM trigger: {e}")
+
+    # ---------------- PUPIL LABS MARKER ----------------
+    if neon_device:
+        try:
+            await asyncio.to_thread(
+                neon_device.send_event,
+                "TEST_TRIGGER"
+            )
+
+            print("Neon trigger sent")
+
+        except Exception as e:
+            print(f"Failed to send Neon trigger: {e}")
+
 # ------------------ QTM SAVE & RESET ------------------
 async def save_qtm_recording():
     global qtm_connection
@@ -428,7 +474,8 @@ def on_end_button():
     loop.call_soon_threadsafe(loop.stop)
     root.destroy()
 
-
+def on_trigger_button():
+    asyncio.run_coroutine_threadsafe(send_test_trigger(), loop)
 # ------------------ EXCEL EXPORT ------------------
 def export_to_excel():
     if not event_log:
@@ -562,6 +609,17 @@ def build_gui():
 
     stop_btn = tk.Button(root, text="Stop Trial", command=on_stop_trial_button, width=25, height=3)
     stop_btn.pack(pady=10, padx=20)
+
+    trigger_btn = tk.Button(
+        root,
+        text="Test Trigger",
+        command=on_trigger_button,
+        width=25,
+        height=3,
+        bg="red",
+        fg="white"
+    )
+    trigger_btn.pack(pady=10, padx=20)
 
     save_btn = tk.Button(root, text="Save Recording", command=on_save_button, width=25, height=3)
     save_btn.pack(pady=10, padx=20)
