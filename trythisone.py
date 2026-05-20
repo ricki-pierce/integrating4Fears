@@ -1,4 +1,7 @@
 """
+
+*using this code on 5/17/26, i ran 25 trials (20 useable) and got that there was a delay of about 20.9ms +/- 2.6ms regarding moment of impact.
+
 Integrated QTM + Arduino (Seesaw Buttons) + Excel Logger + Task Manager
 
 When run, you will be asked to type in the names of the tasks (cup grabbing, buttoning shirt, light up LEDs, etc.).
