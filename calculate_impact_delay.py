@@ -1,7 +1,7 @@
 """
 Sync Offset Analysis — Updated Methodology
 ===========================================
-Used on data files resulting from running rearranging.py
+Used on data files resulting from running rearranging.py 
 
 Calculates the time offset at moment of impact between Pupil Labs Neon (phone clock) and QTM
 (PC clock) across multiple trials.
