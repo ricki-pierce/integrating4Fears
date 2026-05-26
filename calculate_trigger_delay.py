@@ -1,5 +1,5 @@
 """
-Sync Offset Analysis — Trigger Version
+Sync Offset Analysis — Trigger Version 
 =======================================
 Calculates the time offset at moment of trigger between Pupil Labs Neon
 (phone clock) and QTM (PC clock) across multiple trials.
