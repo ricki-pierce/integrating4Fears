@@ -1,5 +1,5 @@
 """
-Sync Offset Analysis — Start Time Version
+Sync Offset Analysis — Start Time Version 
 ==========================================
 Calculates the time offset between Pupil Labs Neon (phone clock) and QTM
 (PC clock) using only recording start times — no trigger or impact events.
